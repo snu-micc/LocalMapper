@@ -20,7 +20,6 @@ from dgllife.utils import WeaveAtomFeaturizer, CanonicalBondFeaturizer, mol_to_b
 from models import LocalMapper
 from dataset import ReactionDataset, mkdir_p
 
-
 def get_user_name(args):
     if 'chemist_name' in args:
         return args['chemist_name']
@@ -45,12 +44,6 @@ def get_configure(args):
     config['in_edge_feats'] = args['edge_featurizer'].feat_size()
     return config
     
-def Twoway_CrossEntropyLoss(pred, true):
-    normalized_pred = torch.nn.LogSoftmax(dim = 0)(pred) + torch.nn.LogSoftmax(dim = 1)(pred)
-    # log_pred = torch.log(pred)
-    loss = nn.NLLLoss(reduction = 'none')
-    return loss(normalized_pred, true)
-    
 def load_dataloader(args, test = False):
     dataset = ReactionDataset(args)
     train_set, val_set, test_set = Subset(dataset, dataset.train_idx), Subset(dataset, dataset.val_idx), Subset(dataset, dataset.test_idx)
@@ -62,6 +55,11 @@ def load_dataloader(args, test = False):
         train_loader = DataLoader(dataset=train_set, batch_size=args['batch_size'], shuffle=True, collate_fn=collate_molgraphs)
         val_loader = DataLoader(dataset=val_set, batch_size=args['batch_size'], shuffle=False, collate_fn=collate_molgraphs)
     return train_loader, val_loader
+    
+def Twoway_CrossEntropyLoss(pred, true):
+    normalized_pred = torch.nn.LogSoftmax(dim = 0)(pred) + torch.nn.LogSoftmax(dim = 1)(pred)
+    loss = nn.NLLLoss(reduction = 'none')
+    return loss(normalized_pred, true)
     
 def load_model(args):
     exp_config = get_configure(args)
@@ -77,16 +75,9 @@ def load_model(args):
 
     if args['mode'] == 'train':
         loss_criterion = Twoway_CrossEntropyLoss
-#         loss_criterion = nn.CrossEntropyLoss(reduction = 'none')
         optimizer = Adam(model.parameters(), lr=args['learning_rate'], weight_decay=args['weight_decay'])
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, min_lr=1e-4)
-#         scheduler = lr_scheduler.StepLR(optimizer, step_size=args['schedule_step'], gamma=0.1)
-#         scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=args['num_epochs'], eta_min=1e-5, last_epoch=-1)
         stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
-#         if os.path.exists(args['model_path']):
-#             stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
-#         else:
-#             stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
         return model, loss_criterion, optimizer, scheduler, stopper
     
     else:

@@ -143,7 +143,6 @@ class AtomMapper:
             neighbors_in_products = self.p_adj_matrix[product_atom]
             neighbors_in_reactants = self.r_adj_matrix[reactant_atom]
             self.neighbor_weight_matrix[np.ix_(neighbors_in_products, neighbors_in_reactants)] *= float(self.neighbor_weight)
-            
             self.isolated_carbons[neighbors_in_products] = False
             
             # Mapped molecules

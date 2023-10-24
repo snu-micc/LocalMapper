@@ -42,7 +42,6 @@ def main(args):
     
     args['data_dir'] = '../data/%s/' % args['dataset']
     args['output_dir'] = '../outputs/%s/%s/' % (args['dataset'], args['chemist_name'])
-#     args['model_path'] =  '../models/%s/%s/LocalMapper_%d.pth' % ('USPTO_50K', args['chemist_name'], 5)
     args['model_path'] =  '../models/%s/%s/LocalMapper_%d.pth' % (args['model_dataset'], args['chemist_name'], args['iteration'])
     args['config_path'] = '../data/configs/%s' % args['config']
     mkdir_p(args['output_dir'])

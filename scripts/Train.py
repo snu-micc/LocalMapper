@@ -27,7 +27,6 @@ def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer
         optimizer.step()
         train_loss += loss.item()    
         if batch_id % args['print_every'] == 0:
-#             print (loss_criterion(logits, labels) * (masks != 0))
             print('\repoch %d/%d, batch %d/%d, loss %.4f' % (epoch+1,args['num_epochs'],batch_id+1,len(data_loader),loss), end='', flush=True)
     if epoch < 0:
         optimizer.param_groups[0]['lr'] = args['learning_rate']
