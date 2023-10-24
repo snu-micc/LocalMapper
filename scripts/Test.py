@@ -25,13 +25,13 @@ def get_atom_map(args, model, data_loader):
     with open(file_path, 'w') as f:
         f.write('Reaction_id\tMapped_reaction\tTemplate\n')
         with torch.no_grad():
-            for batch_data in tqdm(data_loader, total = len(data_loader), desc = 'Predicting PxR inference...'):
-                idxs, rxns, rbg, pbg, radm, padm, _, _ = batch_data
-                logits_list = predict(args, model, rbg, pbg, radm, padm)
+            for batch_data in tqdm(data_loader, total = len(data_loader), desc = 'Predicting AAM...'):
+                idxs, rxns, rbg, pbg, _, _, _ = batch_data
+                logits_list = predict(args, model, rbg, pbg)
                 for rxn, logits, idx in zip(rxns, logits_list, idxs):
-                    prediction = (torch.softmax(logits, dim = 0)*torch.softmax(logits, dim = 1)).cpu().numpy()
-                    mapped_rxn, template, _ = prediction2map(rxn, prediction, args)
-                    f.write('%s\t%s\t%s\n' % (idx, mapped_rxn, template))
+                    prediction = torch.softmax(logits, dim = 1).cpu().numpy()
+                    result = prediction2map(rxn, prediction)
+                    f.write('%s\t%s\t%s\n' % (idx, result['mapped_rxn'], result['template']))
     return
 
 def main(args):
@@ -42,7 +42,8 @@ def main(args):
     
     args['data_dir'] = '../data/%s/' % args['dataset']
     args['output_dir'] = '../outputs/%s/%s/' % (args['dataset'], args['chemist_name'])
-    args['model_path'] =  '../models/%s/%s/LocalMapper_%d.pth' % (args['dataset'], args['chemist_name'], args['iteration'])
+#     args['model_path'] =  '../models/%s/%s/LocalMapper_%d.pth' % ('USPTO_50K', args['chemist_name'], 5)
+    args['model_path'] =  '../models/%s/%s/LocalMapper_%d.pth' % (args['model_dataset'], args['chemist_name'], args['iteration'])
     args['config_path'] = '../data/configs/%s' % args['config']
     mkdir_p(args['output_dir'])
     
@@ -55,11 +56,12 @@ def main(args):
 if __name__ == '__main__':
     parser = ArgumentParser('LocalMapper testing arguements')
     parser.add_argument('-g', '--gpu', default='cuda:0', help='GPU device to use')
-    parser.add_argument('-d', '--dataset', default='USPTO_50K', help='Dataset to use')
     parser.add_argument('-c', '--config', default='default_config.json', help='Configuration of model')
     parser.add_argument('-b', '--batch-size', default=20, help='Batch size of dataloader')     
     parser.add_argument('-i', '--iteration', type=int, default=1, help='Iteration of active learning')
     parser.add_argument('-s', '--skip', type=int, default=0, help='Skip the data that were used in train/val set.')
+    parser.add_argument('-md', '--model-dataset', default='USPTO_50K', help='Dataset when trained')
+    parser.add_argument('-td', '--dataset', default='USPTO_50K', help='Dataset to predict')
     
     args = parser.parse_args().__dict__
     main(args)

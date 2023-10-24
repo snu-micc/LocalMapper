@@ -20,7 +20,7 @@ def load_templates(files, samp_iter):
     loaded_templates = set()
     for i, file in enumerate(files):
         iteration = int(file.split('_')[-1].split('.')[0])
-        if iteration >= samp_iter:
+        if iteration > samp_iter:
             continue
         df = pd.read_csv(file)
         loaded_templates.update(df['template'].tolist())
@@ -28,9 +28,11 @@ def load_templates(files, samp_iter):
     
 def load_fixed_templates(dataset, chemist_name, samp_iter):
     pred_temps = load_templates(glob.glob('../data/%s/%s/pred_train_*.csv' % (dataset, chemist_name)), samp_iter-1)
-    accepted_temps = load_templates(glob.glob('../data/%s/%s/fixed_train_*.csv' % (dataset, chemist_name)), samp_iter)
-    rejected_templates = set([temp for temp in pred_temps if temp not in accepted_temps])
-    return accepted_temps, rejected_templates
+    accepted_temps = load_templates(glob.glob('../data/%s/%s/fixed_train_*.csv' % (dataset, chemist_name)), samp_iter-1)
+    conf_temps = load_templates(glob.glob('../data/%s/%s/conf_pred_*.csv' % (dataset, chemist_name)), samp_iter)
+    accepted_temps = accepted_temps.union(conf_temps)
+    rejected_temps = set([temp for temp in pred_temps if temp not in accepted_temps])
+    return accepted_temps, rejected_temps
 
 def demap(smiles):
     mol = Chem.MolFromSmiles(smiles)

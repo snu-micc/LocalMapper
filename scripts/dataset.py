@@ -6,6 +6,7 @@ import json
 import pickle
 import glob
 from tqdm import tqdm
+from collections import defaultdict
 
 from rdkit import Chem
 
@@ -26,11 +27,18 @@ def mkdir_p(path):
 def get_adm(mol, max_distance = 4):
     dm = Chem.GetDistanceMatrix(mol)
     dm[dm > 100] = -1 # remote (different molecule)
-    dm[dm > max_distance] = max_distance # remote (same molecule)
-    dm[dm == -1] = max_distance + 1
-    return torch.LongTensor(dm)
+    dm[dm > max_distance] = max_distance + 1 # remote (same molecule)
+    dm[dm == -1] = max_distance + 2 # remote (different molecule)
+    return dm
+
+def product_is_unmapped(rxn):
+    r, p = [Chem.MolFromSmiles(smi) for smi in rxn.split('>>')]
+    rmaps = [atom.GetAtomMapNum() for atom in r.GetAtoms()]
+    pmaps = [atom.GetAtomMapNum() for atom in p.GetAtoms()]
+    return 0 in pmaps or sum([m not in rmaps for m in pmaps]) > 0
 
 def get_mapping_label(rxn):
+#     print (rxn)
     rsmi, psmi = rxn.split('>>')
     rmol = Chem.MolFromSmiles(rsmi)
     pmol = Chem.MolFromSmiles(psmi)
@@ -44,76 +52,117 @@ def clean_reactant_map(rxn):
     r = Chem.MolToSmiles(r_mol, canonical = False)
     return '>>'.join([r, p])
 
+def canonicalize_map_rxn(rxn):
+    new_rxn = []
+    for smi in rxn.split('>>'):
+        mol = Chem.MolFromSmiles(smi)
+        index2mapnums = {}
+        for atom in mol.GetAtoms():
+            index2mapnums[atom.GetIdx()] = atom.GetAtomMapNum()
+        mol_cano = Chem.RWMol(mol)
+        [atom.SetAtomMapNum(0) for atom in mol_cano.GetAtoms()]
+        smi_cano = Chem.MolToSmiles(mol_cano)
+        mol_cano = Chem.MolFromSmiles(smi_cano)
+        matches = mol.GetSubstructMatches(mol_cano)
+        if matches:
+            for atom, mat in zip(mol_cano.GetAtoms(), matches[0]):
+                atom.SetAtomMapNum(index2mapnums[mat])
+            smi = Chem.MolToSmiles(mol_cano, canonical=False)
+        new_rxn.append(smi)
+    return '>>'.join(new_rxn)
+
 class ReactionDataset(object):
-    def __init__(self, args, val_rate = 0.1):
+    def __init__(self, args):
         df = pd.read_csv('%s/raw_data.csv' % (args['data_dir']))
+        self.mode = args['mode']
         self.rxns = df['mapped_rxn'].tolist()
         self.idxs = [idx for idx in range(len(self.rxns))]
         self.labels = [[] for _ in range(len(self.rxns))]
-        self.rgraph_path = '%s/saved_graphs/reactants.bin' % (args['data_dir'])
-        self.pgraph_path = '%s/saved_graphs/products.bin' % (args['data_dir'])
-        self.radm_path = '%s/saved_graphs/radm.pkl' % (args['data_dir'])
-        self.padm_path = '%s/saved_graphs/padm.pkl' % (args['data_dir'])
-        
-        self._split_data(args, val_rate)
-        self._pre_process(args)
-        
-    def _load_train_conf_rxns(self, args):
-        idxs = {'fixed_train': [], 'conf_pred': []}
-        for i in range(args['iteration']):
-            for train_type in ['fixed_train', 'conf_pred']:
-                file_path = '%s/%s/%s_%d.csv' % (args['data_dir'], args['chemist_name'], train_type, i+1)
-                if os.path.exists(file_path):
-                    df = pd.read_csv(file_path)
-                    idxs[train_type] += df['data_idx'].tolist()
-                    if args['mode'] == 'train':
-                        for idx, rxn in zip(df['data_idx'], df['mapped_rxn']):
-                            self.rxns[idx] = rxn
-                            self.labels[idx] = get_mapping_label(rxn)
-        return idxs['fixed_train'], idxs['conf_pred']
-
-    def _split_data(self, args, val_rate):
-        train_idxs, learned_idxs = self._load_train_conf_rxns(args)
-        val_size = int(len(learned_idxs)*val_rate)
-        np.random.shuffle(learned_idxs)
-        self.val_idx = learned_idxs[:val_size]
-        self.train_idx = train_idxs + learned_idxs[val_size:]
-        if args['mode'] == 'train' or args['skip']:
-            self.test_idx = [idx for idx in self.idxs if idx not in train_idxs+learned_idxs]
+        self.weights = [1]*len(self.rxns)
+        self.mol_to_graph = args['mol_to_graph']
+        if self.mode == 'train':
+            self._load_conf_rxns(args)
+            self._make_graphs()
         else:
-            self.test_idx = self.idxs
-        print ('Loaded %d train reaction, %d val reactions, %d test reactions' % (len(self.train_idx), len(self.val_idx), len(self.test_idx)))
+            self.train_idx, self.val_idx, self.test_idx = [], [], self.idxs
+        
+        
+    def _load_conf_rxns(self, args):
+        print ('Preparing AAM labels...')
+        train_idx, val_idx = set(), set()
+        mapped_rxns = {}
+        for i in range(args['iteration']):
+            manual_df = pd.read_csv('%s/%s/fixed_train_%d.csv' % (args['data_dir'], args['chemist_name'], i+1))
+            for idx, rxn in zip(manual_df['data_idx'], manual_df['mapped_rxn']):
+                train_idx.add(idx)
+                mapped_rxns[idx] = rxn
+                self.weights[idx] = 100
+        print ('Load %d reactions from fixed predictions' % len(mapped_rxns))
+               
+        conf_df = pd.read_csv('%s/%s/conf_pred_%d.csv' % (args['data_dir'], args['chemist_name'], args['iteration']))
+        templates_idx = defaultdict(list)
+        for i in conf_df.index:
+            data_idx = conf_df['data_idx'][i]
+            template = conf_df['template'][i]
+            rxn = conf_df['mapped_rxn'][i]
+            if data_idx not in train_idx and not product_is_unmapped(rxn):
+                templates_idx[template].append(i)
+                mapped_rxns[data_idx] = rxn
+        print ('Load %d templates with total %d reactions from confident predictions' % (len(templates_idx), len(conf_df)))
+               
+            
+        for template, idx_list in templates_idx.items():
+            if len(idx_list) > 100:
+                sample_size = 100
+                add_to_val = True
+                template_weight = 1
+            else:
+                sample_size = len(idx_list)
+                add_to_val = False
+                template_weight = 100/sample_size
+            np.random.shuffle(idx_list)
+            sampled_idx_list = idx_list[:sample_size]
+            data_idxs = [conf_df['data_idx'][i] for i in sampled_idx_list]
+            if add_to_val:
+                train_idx.update(data_idxs[:90])
+                val_idx.update(data_idxs[90:])
+            else:
+                train_idx.update(data_idxs)
+            for idx in data_idxs:
+                self.weights[idx] = template_weight
+        print ('Sampled %d train reaction, %d val reactions' % (len(train_idx), len(val_idx)))
+               
+        for idx, rxn in mapped_rxns.items():
+            self.rxns[idx] = rxn
+            self.labels[idx] = get_mapping_label(rxn)
+        self.train_idx, self.val_idx, self.test_idx = list(train_idx), list(val_idx), []
         return 
 
-    def _pre_process(self, args):
-        if args['mode'] == 'test' and os.path.exists(self.rgraph_path) and os.path.exists(self.pgraph_path):
-            print('Loading previously saved dgl graphs...')
-            self.rgraphs, _ = load_graphs(self.rgraph_path)
-            self.pgraphs, _ = load_graphs(self.pgraph_path)
-            self.adms_r = pickle.load(open(self.radm_path,'rb'))
-            self.adms_p = pickle.load(open(self.padm_path,'rb'))
-        else:
-            mkdir_p('%s/saved_graphs/' % args['data_dir'])
-            self.mol_to_graph = args['mol_to_graph']
-            print('Processing dgl graphs from scratch...')
-            self.rgraphs, self.pgraphs, self.adms_r, self.adms_p = [], [], [], []
-            for rxn in tqdm(self.rxns, total = len(self.rxns), desc = 'Generating molecule graphs...'):
+    def _make_graphs(self):
+        self.rgraphs, self.pgraphs = [], []
+        for i, rxn in tqdm(enumerate(self.rxns), total = len(self.rxns), desc = 'Generating molecule graphs...'):
+            if i not in self.train_idx+self.val_idx:
+                self.rgraphs.append(None)
+                self.pgraphs.append(None)
+            else:
                 r, p = rxn.split('>>')
                 r, p = Chem.MolFromSmiles(r), Chem.MolFromSmiles(p)
-                self.adms_r.append(get_adm(r))
-                self.adms_p.append(get_adm(p))
                 self.rgraphs.append(self.mol_to_graph(r))
                 self.pgraphs.append(self.mol_to_graph(p))
-                
-#             save_graphs(self.rgraph_path, self.rgraphs)
-#             save_graphs(self.pgraph_path, self.pgraphs)
-#             with open(self.radm_path, 'wb') as f1, open(self.padm_path, 'wb') as f2:
-#                 pickle.dump(self.adms_r, f1)
-#                 pickle.dump(self.adms_p, f2)
         return 
 
     def __getitem__(self, item):
-        return self.idxs[item], self.rxns[item], self.rgraphs[item], self.pgraphs[item], self.adms_r[item], self.adms_p[item], self.labels[item]
+        rxn = self.rxns[item]
+        if self.mode == 'train':
+            rgraph, pgraph = self.rgraphs[item], self.pgraphs[item]
+        else:
+            if len(rxn.split('>>')) != 2: # in case of bad reaction
+                item = 1
+                rxn = self.rxns[item]
+            r, p = rxn.split('>>')
+            r, p = Chem.MolFromSmiles(r), Chem.MolFromSmiles(p)
+            rgraph, pgraph = self.mol_to_graph(r), self.mol_to_graph(p)
+        return self.idxs[item], rxn, rgraph, pgraph, self.labels[item], self.weights[item]
 
     def __len__(self):
             return len(self.rxns)

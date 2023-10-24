@@ -7,42 +7,47 @@ import torch.nn as nn
 from utils import mkdir_p, get_user_name, init_featurizer, get_configure, load_model, load_dataloader, predict
 
 def run_a_train_epoch(args, epoch, model, data_loader, loss_criterion, optimizer):
+    if epoch < 0: # warmup
+        optimizer.param_groups[0]['lr'] = args['learning_rate']*0.001
     model.train()
     train_loss = 0
     for batch_id, batch_data in enumerate(data_loader):
-        idxs, rxns, rbg, pbg, radms, padms, labels_list, masks_list = batch_data
+        idxs, rxns, rbg, pbg, labels_list, masks_list, weight_list = batch_data
         labels_list, masks_list = [labels.to(args['device']) for labels in labels_list], [masks.to(args['device']) for masks in masks_list]
-        logits_list = predict(args, model, rbg, pbg, radms, padms)
+        logits_list = predict(args, model, rbg, pbg)
         loss = 0
-        for logits, labels, masks in zip(logits_list, labels_list, masks_list):
-            loss += (loss_criterion(logits, labels) * (masks != 0)).float().mean()
-        loss = loss/args['batch_size']
+        total_weights = 0
+        for logits, labels, masks, weight in zip(logits_list, labels_list, masks_list, weight_list):
+            loss += weight*(loss_criterion(logits, labels) * (masks != 0)).float().mean()
+            total_weights += weight
+        loss = loss/total_weights
         optimizer.zero_grad()      
         loss.backward() 
         nn.utils.clip_grad_norm_(model.parameters(), args['max_clip'])
         optimizer.step()
         train_loss += loss.item()    
         if batch_id % args['print_every'] == 0:
-            print('\repoch %d/%d, batch %d/%d, loss %.4f' % (epoch + 1,args['num_epochs'],batch_id+1,len(data_loader),loss), end='', flush=True)
-#             print('\repoch %d/%d, batch %d/%d, loss %.4f, lr: %.6f' % (epoch + 1, args['num_epochs'], batch_id+1, len(data_loader), loss, scheduler.get_last_lr()[0]), end='', flush=True)
-#     scheduler.step()
+#             print (loss_criterion(logits, labels) * (masks != 0))
+            print('\repoch %d/%d, batch %d/%d, loss %.4f' % (epoch+1,args['num_epochs'],batch_id+1,len(data_loader),loss), end='', flush=True)
+    if epoch < 0:
+        optimizer.param_groups[0]['lr'] = args['learning_rate']
     return
 
 
 def run_an_val_epoch(args, model, data_loader, loss_criterion):
     model.eval()
-    temp_list,val_loss = [],0
-    rxns_list, mapped_rxns_list = [], []
-        
+    val_loss = 0
     with torch.no_grad():
         for batch_id, batch_data in enumerate(data_loader):
-            idxs, rxns, rbg, pbg, radms, padms, labels_list, masks_list = batch_data
+            idxs, rxns, rbg, pbg, labels_list, masks_list, weight_list = batch_data
             labels_list, masks_list = [labels.to(args['device']) for labels in labels_list], [masks.to(args['device']) for masks in masks_list]
-            logits_list = predict(args, model, rbg, pbg, radms, padms)
+            logits_list = predict(args, model, rbg, pbg)
             loss = 0
-            for logits, labels, masks in zip(logits_list, labels_list, masks_list):
-                loss += (loss_criterion(logits, labels) * (masks != 0)).float().mean()
-            loss = loss/args['batch_size']
+            total_weights = 0
+            for logits, labels, masks, weight in zip(logits_list, labels_list, masks_list, weight_list):
+                loss += weight*(loss_criterion(logits, labels) * (masks != 0)).float().mean()
+                total_weights += weight
+            loss = loss/total_weights
             val_loss += loss.item()  
     return val_loss/(batch_id+1)
 
@@ -62,9 +67,10 @@ def main(args):
     args['config_path'] = '../data/configs/%s' % args['config']
     train_loader, val_loader = load_dataloader(args)
     model, loss_criterion, optimizer, scheduler, stopper = load_model(args)
+    run_a_train_epoch(args, -1, model, train_loader, loss_criterion, optimizer)
     for epoch in range(args['num_epochs']):
         run_a_train_epoch(args, epoch, model, train_loader, loss_criterion, optimizer)
-        if args['iteration'] == 1:
+        if args['dataset'] == 'USPTO_50K' and args['iteration'] == 1:
             val_loss = 1/(epoch+1)
         else:
             val_loss = run_an_val_epoch(args, model, val_loader, loss_criterion)
@@ -81,16 +87,14 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gpu', default='cuda:0', help='GPU device to use')
     parser.add_argument('-d', '--dataset', default='USPTO_50K', help='Dataset to use')
     parser.add_argument('-c', '--config', default='default_config.json', help='Configuration of model')
-    parser.add_argument('-b', '--batch-size', default=20, help='Batch size of dataloader')                             
-    parser.add_argument('-n', '--num-epochs', type=int, default=30, help='Maximum number of epochs for training')
+    parser.add_argument('-b', '--batch-size', default=16, help='Batch size of dataloader')                             
+    parser.add_argument('-n', '--num-epochs', type=int, default=100, help='Maximum number of epochs for training')
     parser.add_argument('-p', '--patience', type=int, default=5, help='Patience for early stopping')
     parser.add_argument('-i', '--iteration', type=int, default=1, help='Iteration of active learning')
     parser.add_argument('-cl', '--max-clip', type=int, default=20, help='Maximum number of gradient clip')
     parser.add_argument('-lr', '--learning-rate', type=float, default=1e-3, help='Learning rate of optimizer')
     parser.add_argument('-l2', '--weight-decay', type=float, default=1e-6, help='Weight decay of optimizer')
-    parser.add_argument('-ss', '--schedule_step', type=int, default=1, help='Step size of learning scheduler')
+    parser.add_argument('-ss', '--schedule_step', type=int, default=10, help='Step size of learning scheduler')
     parser.add_argument('-pe', '--print-every', type=int, default=20, help='Print the training progress every X mini-batches')
     args = parser.parse_args().__dict__
-    
-#     print('Using device %s' % args['device'])
     main(args)

@@ -3,6 +3,7 @@ import sklearn
 import dgl
 import json
 import os
+import copy
 import numpy as np
 import glob
 from functools import partial
@@ -10,7 +11,7 @@ from collections import defaultdict
 import sys
 
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 from torch.optim import Adam, lr_scheduler
 
 from dgl.data.utils import Subset
@@ -44,14 +45,16 @@ def get_configure(args):
     config['in_edge_feats'] = args['edge_featurizer'].feat_size()
     return config
     
-def Double_CrossEntropyLoss(pred, true):
+def Twoway_CrossEntropyLoss(pred, true):
     normalized_pred = torch.nn.LogSoftmax(dim = 0)(pred) + torch.nn.LogSoftmax(dim = 1)(pred)
+    # log_pred = torch.log(pred)
     loss = nn.NLLLoss(reduction = 'none')
     return loss(normalized_pred, true)
     
 def load_dataloader(args, test = False):
     dataset = ReactionDataset(args)
     train_set, val_set, test_set = Subset(dataset, dataset.train_idx), Subset(dataset, dataset.val_idx), Subset(dataset, dataset.test_idx)
+    
     if test:
         test_loader = DataLoader(dataset=test_set, batch_size=args['batch_size'], shuffle=False, collate_fn=collate_molgraphs)
         return test_loader
@@ -73,20 +76,21 @@ def load_model(args):
     model = model.to(args['device'])
 
     if args['mode'] == 'train':
-        loss_criterion = Double_CrossEntropyLoss
+        loss_criterion = Twoway_CrossEntropyLoss
+#         loss_criterion = nn.CrossEntropyLoss(reduction = 'none')
         optimizer = Adam(model.parameters(), lr=args['learning_rate'], weight_decay=args['weight_decay'])
-        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, min_lr=5e-5)
-#         scheduler = lr_scheduler.StepLR(optimizer, step_size=10, gamma = 0.5)
+        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, min_lr=1e-4)
+#         scheduler = lr_scheduler.StepLR(optimizer, step_size=args['schedule_step'], gamma=0.1)
 #         scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=args['num_epochs'], eta_min=1e-5, last_epoch=-1)
-        
-        if os.path.exists(args['model_path']):
-            stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
-        else:
-            stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
+        stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
+#         if os.path.exists(args['model_path']):
+#             stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
+#         else:
+#             stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
         return model, loss_criterion, optimizer, scheduler, stopper
     
     else:
-        model.load_state_dict(torch.load(args['model_path'])['model_state_dict'])
+        model.load_state_dict(torch.load(args['model_path'], map_location=args['device'])['model_state_dict'])
         return model            
 
 def mask_labels(labels_list):
@@ -99,20 +103,19 @@ def mask_labels(labels_list):
         masks_list.append(torch.LongTensor(masks))
         
     return fixed_labels_list, masks_list
-        
+
 def collate_molgraphs(data):
-    idxs, rxns, rgraphs, pgraphs, radms, padms, labels_list = map(list, zip(*data))
+    idxs, rxns, rgraphs, pgraphs, labels_list, weights_list = map(list, zip(*data))
     labels_list, masks_list = mask_labels(labels_list)
     rbg, pbg = dgl.batch(rgraphs),  dgl.batch(pgraphs)
     rbg.set_n_initializer(dgl.init.zero_initializer) 
     pbg.set_n_initializer(dgl.init.zero_initializer)
     rbg.set_e_initializer(dgl.init.zero_initializer)
     pbg.set_e_initializer(dgl.init.zero_initializer)
-    return idxs, rxns, rbg, pbg, radms, padms, labels_list, masks_list
+    return idxs, rxns, rbg, pbg, labels_list, masks_list, weights_list
 
-def predict(args, model, rbg, pbg, radms, padms):
+def predict(args, model, rbg, pbg):
     rbg, pbg = rbg.to(args['device']), pbg.to(args['device'])
-#     adms = [adm.to(args['device']) for adm in adms],
     rnode_feats, pnode_feats = rbg.ndata.pop('h').to(args['device']), pbg.ndata.pop('h').to(args['device'])
     redge_feats, pedge_feats = rbg.edata.pop('e').to(args['device']), pbg.edata.pop('e').to(args['device'])
-    return model(rbg, pbg, rnode_feats, pnode_feats, redge_feats, pedge_feats, radms, padms)
+    return model(rbg, pbg, rnode_feats, pnode_feats, redge_feats, pedge_feats)

@@ -9,7 +9,9 @@ Implementation of LocalMapper developed by Prof. Yousung Jung group at Seoul Nat
 - [OS Requirements](#os-requirements)
 - [Python Dependencies](#python-dependencies)
 - [Installation Guide](#installation-guide)
+- [Data](#data)
 - [Reproduce the results](#reproduce-the-results)
+- [Demo](#demo)
 - [Publication](#publication)
 - [License](#license)
 
@@ -42,11 +44,19 @@ conda install -c dglteam dgl-cuda11.3
 pip install dgllife
 ```
 
+## Data
+#### USPTO dataset
+The mapped reactions of USPTO 50K and USPTO FULL are available at [Dropbox](https://www.dropbox.com/scl/fo/y2ltxgem80uiwbhky9w35/h?rlkey=30mkkxh2llhxze34zpql24jaf&dl=0) 
+
+#### Reference dataset
+AAM predictions on 491 reactions from [Jaworski et al.](https://www.nature.com/articles/s41467-019-09440-2) and 3,000 reactions from USPTO 50K by LocalMapper, [RXNMapper](https://www.science.org/doi/10.1126/sciadv.abe4166), and [GraphormerMapper](https://pubs.acs.org/doi/10.1021/acs.jcim.2c00344) are provided [here](https://github.com/kaist-amsg/LocalMapper/tree/main/comparison) for referece.
+
 ## Reproduce the results
 ### [0] Change the chemist name
 Go to `LocalMapper/manual/` folder and change name of file `User.user` to `[your-name].user`.
 
 ### [1] Sample the reaction from raw_data
+Download raw data of USPTO_50K from [Dropbox](https://www.dropbox.com/scl/fo/y2ltxgem80uiwbhky9w35/h?rlkey=30mkkxh2llhxze34zpql24jaf&dl=0) 
 Go to `LocalMapper/scripts/` folder and run `Sample.py` with -i (iteration) = 1
 ```
 python Sample.py -i 1
