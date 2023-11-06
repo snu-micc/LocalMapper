@@ -69,7 +69,7 @@ def main(args):
     run_a_train_epoch(args, -1, model, train_loader, loss_criterion, optimizer)
     for epoch in range(args['num_epochs']):
         run_a_train_epoch(args, epoch, model, train_loader, loss_criterion, optimizer)
-        if args['dataset'] == 'USPTO_50K' and args['iteration'] == 1:
+        if len(val_loader) == 0:
             val_loss = 1/(epoch+1)
         else:
             val_loss = run_an_val_epoch(args, model, val_loader, loss_criterion)

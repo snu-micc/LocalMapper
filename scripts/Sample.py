@@ -60,6 +60,8 @@ def load_templates(args, files, load_prev):
     return loaded_templates
     
 def load_fixed_templates(args, load_prev=False):
+    if 'sample_dir' not in args:
+        args['sample_dir'] = '%s/%s' % (args['data_dir'], args['chemist_name'])
     pred_templates = load_templates(args, glob.glob('%s/pred_train_*.csv' % args['sample_dir']), load_prev)
     conf_templates = load_templates(args, glob.glob('%s/conf_pred_*.csv' % args['sample_dir']), load_prev)
     accepted_templates = load_templates(args, glob.glob('%s/fixed_train_*.csv' % args['sample_dir']), load_prev)

@@ -11,7 +11,7 @@ from LocalTemplate.template_extractor import extract_from_reaction
 
 from rdkit import Chem
     
-def prediction2map(rxn, prediction, fix_product_mapping = False, return_template = True, neighbor_weight = 10):
+def prediction2map(rxn, prediction, fix_product_mapping=False, return_template=True, neighbor_weight=10):
     reactant, product = rxn.split('>>')
     if fix_product_mapping:
         product_mapping = {atom.GetIdx(): atom.GetAtomMapNum() for atom in Chem.MolFromSmiles(product).GetAtoms()}
@@ -67,16 +67,13 @@ class AtomMapper:
     def get_adj_matrix(self):
         self.p_adj_matrix = np.array(Chem.GetAdjacencyMatrix(self.product_mol), "bool")
         self.r_adj_matrix = np.array(Chem.GetAdjacencyMatrix(self.reactant_mol), "bool")
-        self.isolated_carbons = np.zeros(self.n_patoms, dtype=bool)
-        self.isolated_carbons[[atom.GetSymbol() == 'C' for atom in self.patoms]] = True
+        self.isolated_carbons = np.zeros(self.n_ratoms, dtype=bool)
+        self.isolated_carbons[[atom.GetSymbol() == 'C' for atom in self.ratoms]] = True
         
         self.r_mol_matrix = np.array(Chem.GetDistanceMatrix(self.reactant_mol)) < 100
         self.r_mol_matrix[[atom.GetSymbol() == 'C' for atom in self.ratoms]] = False
         self.mapped_molecules = np.zeros(self.n_ratoms, dtype=bool)
         return 
-    
-    def _get_isolated_carbons(self, predictions):
-        return [isolated and np.max(predictions[i]) < 0.5 for i, isolated in enumerate(self.isolated_carbons)]
 
     def _get_normailzed_predictions(self, predictions):
         
@@ -92,11 +89,14 @@ class AtomMapper:
         )
         normalized_predictions = row_normalized*column_normalized
         
-        # prevent hopping carbon-mapping
-        low_score = np.max(predictions, axis=1) < 0.5
-        normalized_predictions[low_score+self.isolated_carbons, :] *= 0.01
+        # prevent hopping AAM
+        low_score = np.max(predictions, axis=0) < 0.5
+        if self.neighbor_weight < 90:
+            normalized_predictions[:, low_score+self.isolated_carbons] *= 0.01
+        else:
+            normalized_predictions[:, low_score] *= 0.01
         
-#         # in case of multiple reagents
+        # in case of multiple reagents
         normalized_predictions[:, self.mapped_molecules] *= 0.99
         
         return normalized_predictions
@@ -133,9 +133,9 @@ class AtomMapper:
             self.product_mapping[int(product_atom_to_map)], self.reactant_mapping[int(corresponding_reactant_atom)] = map_number, map_number
         
         self.map_steps = pd.DataFrame({t[0]: t[1:] for t in mapping_steps}, index=['product_idx', 'reactant_idx', 'score'])
-        self.map_on_rxn(self.reactant_mapping, self.product_mapping)
+        mapped_rxn = self.map_on_rxn(self.reactant_mapping, self.product_mapping)
 
-        return self.mapped_rxn
+        return mapped_rxn
     
     def _update_neighbor_weight_matrix(self, product_atom, reactant_atom):
         if reactant_atom != -1:
@@ -143,8 +143,9 @@ class AtomMapper:
             neighbors_in_products = self.p_adj_matrix[product_atom]
             neighbors_in_reactants = self.r_adj_matrix[reactant_atom]
             self.neighbor_weight_matrix[np.ix_(neighbors_in_products, neighbors_in_reactants)] *= float(self.neighbor_weight)
-            self.isolated_carbons[neighbors_in_products] = False
             
+            self.isolated_carbons[reactant_atom] = False
+            self.isolated_carbons[neighbors_in_reactants] = False
             # Mapped molecules
             self.mapped_molecules[self.r_mol_matrix[reactant_atom]] = True
             
@@ -159,8 +160,8 @@ class AtomMapper:
         self.mapped_product = copy.copy(self.product_mol)
         [atom.SetAtomMapNum(reactant_mapping[atom.GetIdx()]) if atom.GetIdx() in reactant_mapping else atom.SetAtomMapNum(0) for atom in self.mapped_reactant.GetAtoms()]
         [atom.SetAtomMapNum(product_mapping[atom.GetIdx()])  if atom.GetIdx() in product_mapping else atom.SetAtomMapNum(0) for atom in self.mapped_product.GetAtoms()]
-        self.mapped_rxn = '>>'.join(Chem.MolToSmiles(smiles, canonical = False) for smiles in [self.mapped_reactant, self.mapped_product])
-        return 
+        
+        return '>>'.join(Chem.MolToSmiles(smiles, canonical = False) for smiles in [self.mapped_reactant, self.mapped_product])
         
     def plot_prediction(self, plot_raw = False):
         plt.plot()

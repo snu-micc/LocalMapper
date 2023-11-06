@@ -75,13 +75,16 @@ class AtomMapper:
             predicitons = self.model(rbg, pbg, rnode_feats, pnode_feats, redge_feats, pedge_feats)
         return predicitons[0]
 
-    def get_atom_map(self, rxn, fix_product_mapping=False, return_confidence=False, neighbor_weight=10):
+    def get_atom_map(self, rxn, fix_product_mapping=False, return_confidence=False):
         reactant, product = rxn.split('>>')
         prediction = self.pred_pxr(rxn)
         prediction = torch.softmax(prediction, dim = 1).cpu().numpy()
-        result = prediction2map(rxn, prediction, fix_product_mapping, True, neighbor_weight)
+        result = prediction2map(rxn, prediction, fix_product_mapping)
         if return_confidence:
-            result['confidence'] = result['template'] in self.accepted_templates
+            confident = result['template'] in self.accepted_templates
+            if not confident:
+                result = prediction2map(rxn, prediction, fix_product_mapping, neighbor_weight=90)
+            result['confident'] = confident
             return result
         else:
             return result
