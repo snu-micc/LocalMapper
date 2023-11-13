@@ -57,7 +57,7 @@ def load_dataloader(args, test = False):
     return train_loader, val_loader
     
 def Twoway_CrossEntropyLoss(pred, true):
-    normalized_pred = torch.nn.LogSoftmax(dim = 0)(pred) + torch.nn.LogSoftmax(dim = 1)(pred)
+    normalized_pred = nn.LogSoftmax(dim = 0)(pred) + nn.LogSoftmax(dim = 1)(pred)
     loss = nn.NLLLoss(reduction = 'none')
     return loss(normalized_pred, true)
     
@@ -74,7 +74,8 @@ def load_model(args):
     model = model.to(args['device'])
 
     if args['mode'] == 'train':
-        loss_criterion = Twoway_CrossEntropyLoss
+        # loss_criterion = Twoway_CrossEntropyLoss
+        loss_criterions = nn.CrossEntropyLoss()
         optimizer = Adam(model.parameters(), lr=args['learning_rate'], weight_decay=args['weight_decay'])
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, min_lr=1e-4)
         stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
