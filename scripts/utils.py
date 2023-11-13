@@ -75,7 +75,7 @@ def load_model(args):
 
     if args['mode'] == 'train':
         # loss_criterion = Twoway_CrossEntropyLoss
-        loss_criterions = nn.CrossEntropyLoss()
+        loss_criterion = nn.CrossEntropyLoss()
         optimizer = Adam(model.parameters(), lr=args['learning_rate'], weight_decay=args['weight_decay'])
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, min_lr=1e-4)
         stopper = EarlyStopping(mode = 'lower', patience=args['patience'], filename=args['model_path'])
