@@ -47,7 +47,7 @@ pip install dgllife
 #### USPTO dataset
 The raw reactions of USPTO 50K and USPTO FULL are downloaded from the github repo of [RXNMapper](https://github.com/rxn4chemistry/rxnmapper).
 
-The mapped reactions of USPTO 50K and USPTO FULL are available at [Dropbox](https://www.dropbox.com/scl/fo/y2ltxgem80uiwbhky9w35/h?rlkey=30mkkxh2llhxze34zpql24jaf&dl=0).
+The mapped reactions of USPTO 50K and USPTO FULL are available at [Figshare](https://doi.org/10.6084/m9.figshare.25046471.v1).
 
 #### Reference dataset
 AAM predictions on reactions sampled from [USPTO 50K](https://pubs.acs.org/doi/10.1021/acs.jcim.6b00564), [Golden dataset](https://onlinelibrary.wiley.com/doi/10.1002/minf.202100138), and [Jaworski et al.](https://www.nature.com/articles/s41467-019-09440-2) generated  by LocalMapper, [RXNMapper](https://www.science.org/doi/10.1126/sciadv.abe4166), and [GraphormerMapper](https://pubs.acs.org/doi/10.1021/acs.jcim.2c00344) are provided [here](https://github.com/kaist-amsg/LocalMapper/tree/main/comparison).
