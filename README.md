@@ -15,7 +15,7 @@ Implementation of LocalMapper developed by Prof. Yousung Jung group at Seoul Nat
 - [License](#license)
 
 ## Developer
-Shuan Chen (shuankaist@kaist.ac.kr)<br>
+Shuan Chen (shuan.micc@gmail.com)<br>
 
 ## OS Requirements
 This repository has been tested on both **Linux** and **Windows** operating systems.
@@ -107,7 +107,18 @@ print (mapped_rxn) # '[CH3:1][CH:2]([CH3:3])[SH:4].CN(C)C=O.[F:11][c:10]1[cH:9][
 ```
 
 ## Publication
-Under review
+```bibtex
+@article{chen2024precise,
+  title={Precise atom-to-atom mapping for organic reactions via human-in-the-loop machine learning},
+  author={Chen, Shuan and An, Sunggi and Babazade, Ramil and Jung, Yousung},
+  journal={Nature Communications},
+  volume={15},
+  number={1},
+  pages={2250},
+  year={2024},
+  publisher={Nature Publishing Group UK London}
+}
+```
 
 ## License
 This project is covered under the **The GNU General Public License v3.0**.
