@@ -8,9 +8,9 @@ Implementation of LocalMapper developed by Prof. Yousung Jung group at Seoul Nat
 - [OS Requirements](#os-requirements)
 - [Python Dependencies](#python-dependencies)
 - [Installation Guide](#installation-guide)
+- [Usage](#usage)
 - [Data](#data)
 - [Reproduce the results](#reproduce-the-results)
-- [Demo](#demo)
 - [Publication](#publication)
 - [License](#license)
 
@@ -23,25 +23,45 @@ This repository has been tested on both **Linux** and **Windows** operating syst
 ## Python Dependencies
 * Python (version >= 3.6)
 * Numpy (version >= 1.16.4)
+* Matplotlib (version >=3.3.4)
 * PyTorch (version >= 1.0.0)
 * RDKit (version >= 2019)
 * DGL (version >= 0.5.2)
 * DGLLife (version >= 0.2.6)
 
 ## Installation Guide
-Create a virtual environment to run the code of LocalMapper.<br>
-Make sure to install pytorch with the cuda version that fits your device.<br>
-This process usually takes around 5-10 minutes to complete.<br>
+### From pip
 ```
-git clone https://github.com/kaist-amsg/LocalMapper.git
+conda create -n localmapper python=3.6 -y
+conda activate localmapper
+pip install localmapper
+```
+
+### From Github
+```
+git clone https://github.com/snu-micc/LocalMapper.git
 cd LocalMapper
-conda create -c conda-forge -n rdenv python -y
-conda activate rdenv
-conda install pytorch cudatoolkit=11.3 -c pytorch -y
-conda install -c conda-forge rdkit -y
-conda install -c dglteam dgl-cuda11.3
-pip install dgllife
+conda create -n localmapper python=3.6 -y
+conda activate localmapper
+pip install -e .
 ```
+
+## Usage
+```
+from localmapper import localmapper
+mapper = localmapper()
+rxn = 'CC(C)S.CN(C)C=O.Fc1cccnc1F.O=C([O-])[O-].[K+].[K+]>>CC(C)Sc1ncccc1F'
+outputs, result = mapper.get_atom_map(rxn)
+```
+The expected output of `result` should be
+```
+{'input_rxn': 'CC(C)S.CN(C)C=O.Fc1cccnc1F.O=C([O-])[O-].[K+].[K+]>>CC(C)Sc1ncccc1F',
+ 'mapped_rxn': '[CH3:1][CH:2]([CH3:3])[SH:4].CN(C)C=O.[F:11][c:10]1[cH:9][cH:8][cH:7][n:6][c:5]1F.O=C([O-])[O-].[K+].[K+]>>[CH3:1][CH:2]([CH3:3])[S:4][c:5]1[n:6][cH:7][cH:8][cH:9][c:10]1[F:11]',
+ 'template': '[S:1].F-[c:2]>>[S:1]-[c:2]',
+ 'confident': True}
+```
+See `Demo.ipynb` for more running instructions and plotting the results.
+
 
 ## Data
 #### USPTO dataset
@@ -87,23 +107,6 @@ To sample more data for training, sample the data again and train-test the Local
 To start, you should run
 ```
 python Sample.py -i 2
-```
-
-## Demo
-See `Demo.ipynb` for running instructions and expected output.
-
-```
-import torch
-from AtomMapping import AtomMapper
-
-device = torch.device('cpu')  # 'cpu' or 'cuda:0'
-trained_dataset = 'USPTO_FULL' # USPTO_50K or USPTO_FULL
-mapper = AtomMapper(device, dataset=trained_dataset)
-
-rxn = 'CC(C)S.CN(C)C=O.Fc1cccnc1F.O=C([O-])[O-].[K+].[K+]>>CC(C)Sc1ncccc1F'
-prediction = mapper.get_atom_map(rxn, return_confidence=return_confidence)
-mapped_rxn = prediction['mapped_rxn']
-print (mapped_rxn) # '[CH3:1][CH:2]([CH3:3])[SH:4].CN(C)C=O.[F:11][c:10]1[cH:9][cH:8][cH:7][n:6][c:5]1F.O=C([O-])[O-].[K+].[K+]>>[CH3:1][CH:2]([CH3:3])[S:4][c:5]1[n:6][cH:7][cH:8][cH:9][c:10]1[F:11]'
 ```
 
 ## Publication
