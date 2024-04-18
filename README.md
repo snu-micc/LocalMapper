@@ -56,15 +56,9 @@ result = mapper.get_atom_map(rxn)
 ```
 The expected output of `result` should be
 ```
-{
- 'CC(C)S.CN(C)C=O.Fc1cccnc1F.O=C([O-])[O-].[K+].[K+]>>CC(C)Sc1ncccc1F': {
- 'mapped_rxn': '[CH3:1][CH:2]([CH3:3])[SH:4].CN(C)C=O.[F:11][c:10]1[cH:9][cH:8][cH:7][n:6][c:5]1F.O=C([O-])[O-].[K+].[K+]>>[CH3:1][CH:2]([CH3:3])[S:4][c:5]1[n:6][cH:7][cH:8][cH:9][c:10]1[F:11]',
- 'template': '[S:1].F-[c:2]>>[S:1]-[c:2]',
- 'AAM_matrix': (matrix),
- 'confident': True
- }
-}
+'[CH3:1][CH:2]([CH3:3])[SH:4].CN(C)C=O.[F:11][c:10]1[cH:9][cH:8][cH:7][n:6][c:5]1F.O=C([O-])[O-].[K+].[K+]>>[CH3:1][CH:2]([CH3:3])[S:4][c:5]1[n:6][cH:7][cH:8][cH:9][c:10]1[F:11]'
 ```
+
 ### Multiple rxns input
 ```
 rxns = ['CC(C)S.CN(C)C=O.Fc1cccnc1F.O=C([O-])[O-].[K+].[K+]>>CC(C)Sc1ncccc1F', CCOCC.C[Mg+].O=Cc1ccc(F)cc1Cl.[Br-]>>CC(O)c1ccc(F)cc1Cl]
@@ -72,23 +66,27 @@ results = mapper.get_atom_map(rxns)
 ```
 The expected output of `results` should be
 ```
-{
- 'CC(C)S.CN(C)C=O.Fc1cccnc1F.O=C([O-])[O-].[K+].[K+]>>CC(C)Sc1ncccc1F':{
- 'mapped_rxn': '[CH3:1][CH:2]([CH3:3])[SH:4].CN(C)C=O.[F:11][c:10]1[cH:9][cH:8][cH:7][n:6][c:5]1F.O=C([O-])[O-].[K+].[K+]>>[CH3:1][CH:2]([CH3:3])[S:4][c:5]1[n:6][cH:7][cH:8][cH:9][c:10]1[F:11]',
- 'template': '[S:1].F-[c:2]>>[S:1]-[c:2]',
- 'AAM_matrix': (matrix),
- 'confident': True
- },
- 'CCOCC.C[Mg+].O=Cc1ccc(F)cc1Cl.[Br-]>>CC(O)c1ccc(F)cc1Cl':{
- 'mapped_rxn': 'CCOCC.[CH3:1][Mg+].[O:3]=[CH:2][c:4]1[cH:5][cH:6][c:7]([F:8])[cH:9][c:10]1[Cl:11].[Br-]>>[CH3:1][CH:2]([OH:3])[c:4]1[cH:5][cH:6][c:7]([F:8])[cH:9][c:10]1[Cl:11]',
- 'template': '[C:1]-[Mg+].[C:2]=[O:3]>>[C:1]-[C:2]-[O:3]',
- 'AAM_matrix': (matrix),
- 'confident': True
- }
-}
+['[CH3:1][CH:2]([CH3:3])[SH:4].CN(C)C=O.[F:11][c:10]1[cH:9][cH:8][cH:7][n:6][c:5]1F.O=C([O-])[O-].[K+].[K+]>>[CH3:1][CH:2]([CH3:3])[S:4][c:5]1[n:6][cH:7][cH:8][cH:9][c:10]1[F:11]',
+ 'CCOCC.[CH3:1][Mg+].[O:3]=[CH:2][c:4]1[cH:5][cH:6][c:7]([F:8])[cH:9][c:10]1[Cl:11].[Br-]>>[CH3:1][CH:2]([OH:3])[c:4]1[cH:5][cH:6][c:7]([F:8])[cH:9][c:10]1[Cl:11]']
+```
+
+### Return results as dictionary
+```
+rxns = ['CC(C)S.CN(C)C=O.Fc1cccnc1F.O=C([O-])[O-].[K+].[K+]>>CC(C)Sc1ncccc1F', CCOCC.C[Mg+].O=Cc1ccc(F)cc1Cl.[Br-]>>CC(O)c1ccc(F)cc1Cl]
+results = mapper.get_atom_map(rxns, return_dict=True)
+```
+The expected output of `results` should be
+```
+[{'rxn': 'CC(C)S.CN(C)C=O.Fc1cccnc1F.O=C([O-])[O-].[K+].[K+]>>CC(C)Sc1ncccc1F',
+  'mapped_rxn': '[CH3:1][CH:2]([CH3:3])[SH:4].CN(C)C=O.[F:11][c:10]1[cH:9][cH:8][cH:7][n:6][c:5]1F.O=C([O-])[O-].[K+].[K+]>>[CH3:1][CH:2]([CH3:3])[S:4][c:5]1[n:6][cH:7][cH:8][cH:9][c:10]1[F:11]',
+  'template': '[S:1].F-[c:2]>>[S:1]-[c:2]',
+  'confident': True},
+ {'rxn': 'CCOCC.C[Mg+].O=Cc1ccc(F)cc1Cl.[Br-]>>CC(O)c1ccc(F)cc1Cl',
+  'mapped_rxn': 'CCOCC.[CH3:1][Mg+].[O:3]=[CH:2][c:4]1[cH:5][cH:6][c:7]([F:8])[cH:9][c:10]1[Cl:11].[Br-]>>[CH3:1][CH:2]([OH:3])[c:4]1[cH:5][cH:6][c:7]([F:8])[cH:9][c:10]1[Cl:11]',
+  'template': '[C:1]-[Mg+].[C:2]=[O:3]>>[C:1]-[C:2]-[O:3]',
+  'confident': True}]
 ```
 See `Demo.ipynb` for more running instructions and plotting the results.
-
 
 ## Data
 #### USPTO dataset

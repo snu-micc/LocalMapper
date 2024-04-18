@@ -17,12 +17,11 @@ def prediction2map(rxn, prediction, neighbor_weight=10):
         product_mapping = {atom.GetIdx(): atom.GetIdx()+1 for atom in Chem.MolFromSmiles(product).GetAtoms()}
     mapper = AtomMapper(rxn, prediction, product_mapping, neighbor_weight)
     mapped_rxn = mapper.generate_atom_mapping()
-    prediction = mapper.masked_predictions
     try:
         template = extract_from_reaction(mapped_rxn)
     except:
         template = None
-    return prediction, {'mapped_rxn': mapped_rxn, 'template': template}
+    return {'mapped_rxn': mapped_rxn, 'template': template}
         
 
 class AtomMapper:
