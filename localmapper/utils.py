@@ -71,8 +71,8 @@ def load_model(exp_config, model_path, device):
     model.load_state_dict(torch.load(model_path, map_location=device)['model_state_dict'])
     return model            
 
-def predict(model, device, rgraph, pgraph):
-    rbg, pbg = dgl.batch([rgraph]),  dgl.batch([pgraph])
+def predict(model, device, rgraphs, pgraphs):
+    rbg, pbg = dgl.batch(rgraphs),  dgl.batch(pgraphs)
     rbg.set_n_initializer(dgl.init.zero_initializer), pbg.set_n_initializer(dgl.init.zero_initializer)
     rbg.set_e_initializer(dgl.init.zero_initializer), pbg.set_e_initializer(dgl.init.zero_initializer)
     rbg, pbg = rbg.to(device), pbg.to(device)
@@ -80,5 +80,4 @@ def predict(model, device, rgraph, pgraph):
     redge_feats, pedge_feats = rbg.edata.pop('e').to(device), pbg.edata.pop('e').to(device)
     with torch.no_grad():
         predicitons = model(rbg, pbg, rnode_feats, pnode_feats, redge_feats, pedge_feats)
-    return predicitons[0]
-
+    return predicitons
