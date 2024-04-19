@@ -48,31 +48,31 @@ class localmapper:
         predictions = predict(self.model, self.device, rgraphs, pgraphs)
         return [torch.softmax(pred, dim = 1).cpu().numpy() for pred in predictions]
 
-    def get_atom_map(self, rxns):
+    def get_atom_map(self, rxns, return_dict=False):
+        single_input = False
         if isinstance(rxns, str):
             rxns = [rxns]
-        results = {}
+            single_input = True
+        results = []
         predictions = self.pred_pxr(rxns)
-        for rxn, prediction in zip(rxns, predictions):
-            outputs, mapped_result = prediction2map(rxn, prediction)
-            results[rxn] = mapped_result
-            results[rxn]['AAM_matrix'] = outputs
-            confident = results[rxn]['template'] in self.accepted_templates
-            if not confident:
-                outputs, mapped_result = prediction2map(rxn, prediction, 90)
-                results[rxn].update(mapped_result)
-                confident = results[rxn]['template'] in self.accepted_templates
-            results[rxn]['confident'] = confident
-        return results
-    
-    def plot_output(self, outputs):
-        plt.plot()
-        plt.imshow(outputs, cmap = 'coolwarm')
-        plt.colorbar()
-        plt.xlabel('Atom index in reactant')
-        plt.ylabel('Atom index in product')
-        plt.show()
-        return
+        for i, (rxn, prediction) in enumerate(zip(rxns, predictions)):
+            mapped_result = prediction2map(rxn, prediction)
+            if return_dict:
+                result = {'rxn': rxn}
+                result.update(mapped_result)
+                confident = result['template'] in self.accepted_templates
+                if not confident:
+                    mapped_result = prediction2map(rxn, prediction, 90)
+                    result.update(mapped_result)
+                    confident = result['template'] in self.accepted_templates
+                result['confident'] = confident
+            else:
+                result = mapped_result['mapped_rxn']
+            results.append(result)
+        if single_input:
+            return results[0]
+        else:
+            return results
     
     def plot_rxn(self, rxn):
         rdkit_rxn = Chem.rdChemReactions.ReactionFromSmarts(rxn, useSmiles=True)
