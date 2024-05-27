@@ -49,24 +49,22 @@ class localmapper:
         return [torch.softmax(pred, dim = 1).cpu().numpy() for pred in predictions]
 
     def get_atom_map(self, rxns, return_dict=False):
-        single_input = False
-        if isinstance(rxns, str):
+        single_input = isinstance(rxns, str)
+        if single_input:
             rxns = [rxns]
-            single_input = True
         results = []
         predictions = self.pred_pxr(rxns)
         for i, (rxn, prediction) in enumerate(zip(rxns, predictions)):
             mapped_result = prediction2map(rxn, prediction)
-            if return_dict:
-                result = {'rxn': rxn}
+            result = {'rxn': rxn}
+            result.update(mapped_result)
+            confident = result['template'] in self.accepted_templates
+            if not confident:
+                mapped_result = prediction2map(rxn, prediction, 90)
                 result.update(mapped_result)
                 confident = result['template'] in self.accepted_templates
-                if not confident:
-                    mapped_result = prediction2map(rxn, prediction, 90)
-                    result.update(mapped_result)
-                    confident = result['template'] in self.accepted_templates
-                result['confident'] = confident
-            else:
+            result['confident'] = confident
+            if not return_dict:
                 result = mapped_result['mapped_rxn']
             results.append(result)
         if single_input:
