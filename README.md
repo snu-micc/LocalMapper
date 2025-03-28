@@ -2,8 +2,10 @@
 
 Implementation of LocalMapper developed by Prof. Yousung Jung group at Seoul National University (contact: yousung@gmail.com).
 
-## Contents
+## Remove code and license announcement (2025.03.28)
+Part of the code and license are removed.
 
+## Contents
 - [Developer](#developer)
 - [OS Requirements](#os-requirements)
 - [Python Dependencies](#python-dependencies)
